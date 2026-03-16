@@ -40,12 +40,37 @@ cmake -S . -B build -G "Visual Studio 17 2022"
 cmake --build build --config Release
 ```
 
-Build with MSYS2 UCRT64 (recommended if your `microxrcedds` libs were built in `C:\msys64\ucrt64.exe`):
+Build with MSYS2 UCRT64:
+
+Note:
+- If dependencies were installed by `pacman` under `ucrt64`, use `-DMICRO_XRCE_ROOT=/ucrt64`.
+- If dependencies were built from source and installed to `/usr/local`, use `-DMICRO_XRCE_ROOT=/usr/local`.
+- Current `CMakeLists.txt` auto-detects a valid root and will fall back if the provided one is not usable.
 
 ```bash
 cd /d/windows_dll
 cmake -S . -B build-ucrt64 -G Ninja -DCMAKE_BUILD_TYPE=Release -DMICRO_XRCE_ROOT=/ucrt64
 cmake --build build-ucrt64 -j
+```
+
+If you run inside VS Code/PowerShell, use this reliable wrapper (recommended):
+
+```powershell
+C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=UCRT64; export PATH=/ucrt64/bin:/usr/bin:$PATH; cd /d/windows_dll; cmake -S . -B build-ucrt64 -G Ninja -DCMAKE_BUILD_TYPE=Release -DMICRO_XRCE_ROOT=/ucrt64; cmake --build build-ucrt64 -j"
+```
+
+If your headers/libs are in `/usr/local`, run:
+
+```bash
+cd /d/windows_dll
+cmake -S . -B build-ucrt64 -G Ninja -DCMAKE_BUILD_TYPE=Release -DMICRO_XRCE_ROOT=/usr/local
+cmake --build build-ucrt64 -j
+```
+
+Or from PowerShell:
+
+```powershell
+C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=UCRT64; export PATH=/ucrt64/bin:/usr/bin:$PATH; cd /d/windows_dll; cmake -S . -B build-ucrt64 -G Ninja -DCMAKE_BUILD_TYPE=Release -DMICRO_XRCE_ROOT=/usr/local; cmake --build build-ucrt64 -j"
 ```
 
 Important:
