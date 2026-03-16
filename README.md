@@ -1,6 +1,8 @@
 # Windows DLL Receiver
 
-This DLL receives DDS data bridged by `MicroXRCEAgent` and exposes a C API.
+This DLL receives DDS data bridged by `MicroXRCEAgent`.
+
+Current delivery mode is DLL-only: users receive `libjoint_state_xrce_receiver.dll` without an extra public `.h` file.
 
 ## Data Path
 
@@ -81,6 +83,23 @@ Output DLL:
 - `build/Release/joint_state_xrce_receiver.dll`
 - `build-ucrt64/libjoint_state_xrce_receiver.dll`
 
+## Package (DLL-Only)
+
+Generate ZIP package:
+
+```bash
+cd /d/windows_dll/build-ucrt64
+cpack -G ZIP
+```
+
+Output package:
+
+- `build-ucrt64/joint_state_xrce_receiver-1.0.0-windows.zip`
+
+Package content (DLL-only):
+
+- `bin/libjoint_state_xrce_receiver.dll`
+
 ## Windows Demo Program (Use the DLL)
 
 An executable demo is included that calls the DLL C API and prints incoming JSON joint-state messages.
@@ -92,14 +111,14 @@ Build (MSYS2 UCRT64):
 
 ```bash
 cd /d/windows_dll
-cmake -S . -B build-ucrt64-local -G Ninja -DCMAKE_BUILD_TYPE=Release -DMICRO_XRCE_ROOT=/usr/local
-cmake --build build-ucrt64-local -j
+cmake -S . -B build-ucrt64 -G Ninja -DCMAKE_BUILD_TYPE=Release -DMICRO_XRCE_ROOT=/usr/local
+cmake --build build-ucrt64 -j
 ```
 
 Run:
 
 ```bash
-./build-ucrt64-local/joint_state_receiver_demo.exe 192.168.60.80 22018 /xrce/kuka_joint_states_json 0
+./build-ucrt64/joint_state_receiver_demo.exe 192.168.60.80 22018 /xrce/kuka_joint_states_json 0
 ```
 
 Arguments:
@@ -108,40 +127,75 @@ Arguments:
 - `topic_name` (default `/xrce/kuka_joint_states_json`)
 - `domain_id` (default `0`)
 
-## C API
+## DLL-Only Consumer Usage
 
-Header: `include/joint_state_xrce_receiver.h`
+Because the delivered artifact is only a DLL, user programs should dynamically load it and resolve exports.
 
-- `jsxrce_start(...)`: start background receiver
-- `jsxrce_stop()`: stop receiver
-- `jsxrce_is_running()`: query running state
+Export names:
 
-## Example (Windows C/C++)
+- `jsxrce_start`
+- `jsxrce_stop`
+- `jsxrce_is_running`
 
-```c
-#include "joint_state_xrce_receiver.h"
-#include <stdio.h>
+Minimal example (Windows C/C++, no external header):
 
-static void on_msg(const char* json, void* user)
+```cpp
+#include <windows.h>
+#include <cstdint>
+#include <cstdio>
+
+typedef void (*jsxrce_on_message_cb)(const char* json_payload, void* user_data);
+
+typedef int  (__cdecl* fn_jsxrce_start)(
+  const char* agent_ip,
+  uint16_t agent_port,
+  uint16_t domain_id,
+  const char* topic_name,
+  jsxrce_on_message_cb callback,
+  void* user_data);
+
+typedef void (__cdecl* fn_jsxrce_stop)();
+typedef int  (__cdecl* fn_jsxrce_is_running)();
+
+static void on_msg(const char* json, void*)
 {
-    (void)user;
-    printf("RX: %s\n", json);
+  if (json) std::printf("RX: %s\n", json);
 }
 
 int main()
 {
-  int rc = jsxrce_start("192.168.60.80", 22018, 0, "/xrce/kuka_joint_states_json", on_msg, NULL);
-    if (rc != 0)
-    {
-        printf("start failed: %d\n", rc);
-        return 1;
-    }
+  HMODULE h = LoadLibraryA("libjoint_state_xrce_receiver.dll");
+  if (!h)
+  {
+    std::printf("LoadLibrary failed: %lu\n", GetLastError());
+    return 1;
+  }
 
-    printf("running... press Enter to stop\n");
-    getchar();
+  auto p_start = (fn_jsxrce_start)GetProcAddress(h, "jsxrce_start");
+  auto p_stop = (fn_jsxrce_stop)GetProcAddress(h, "jsxrce_stop");
+  auto p_running = (fn_jsxrce_is_running)GetProcAddress(h, "jsxrce_is_running");
 
-    jsxrce_stop();
-    return 0;
+  if (!p_start || !p_stop || !p_running)
+  {
+    std::printf("GetProcAddress failed\n");
+    FreeLibrary(h);
+    return 2;
+  }
+
+  int rc = p_start("192.168.60.80", 22018, 0, "/xrce/kuka_joint_states_json", on_msg, NULL);
+  if (rc != 0)
+  {
+    std::printf("jsxrce_start failed: %d\n", rc);
+    FreeLibrary(h);
+    return 3;
+  }
+
+  std::printf("running... press Enter to stop\n");
+  std::getchar();
+
+  p_stop();
+  FreeLibrary(h);
+  return 0;
 }
 ```
 
@@ -187,7 +241,7 @@ ros2 topic pub -r 2 /kuka_1/joint_states sensor_msgs/msg/JointState "{name: ['jo
 
 ```powershell
 $env:Path = "C:\msys64\ucrt64\bin;C:\msys64\usr\local\bin;" + $env:Path
-.\build-ucrt64-local\joint_state_receiver_demo.exe 192.168.60.80 22018 /xrce/kuka_joint_states_json 0
+.\build-ucrt64\joint_state_receiver_demo.exe 192.168.60.80 22018 /xrce/kuka_joint_states_json 0
 ```
 
 Expected Windows output:

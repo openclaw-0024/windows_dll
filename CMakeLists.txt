@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 project(joint_state_xrce_receiver LANGUAGES C CXX)
 
+include(GNUInstallDirs)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -91,3 +93,16 @@ target_link_libraries(joint_state_xrce_receiver
 if(WIN32)
   target_link_libraries(joint_state_xrce_receiver PRIVATE ws2_32 iphlpapi)
 endif()
+
+# Package artifacts for consumers: DLL + import library + public header.
+install(TARGETS joint_state_xrce_receiver
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+set(CPACK_PACKAGE_NAME "joint_state_xrce_receiver")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-windows")
+set(CPACK_GENERATOR "ZIP")
+include(CPack)
