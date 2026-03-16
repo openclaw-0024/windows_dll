@@ -199,6 +199,92 @@ int main()
 }
 ```
 
+## C# Example (DLL-Only)
+
+An end-to-end C# console example is provided:
+
+- `example/csharp_dll_usage/csharp_dll_usage.csproj`
+- `example/csharp_dll_usage/Program.cs`
+
+### C# compile and run steps (Windows)
+
+1) Open PowerShell and switch to the example folder:
+
+```powershell
+cd D:\windows_dll\example\csharp_dll_usage
+```
+
+2) Ensure runtime DLL search path includes:
+
+- your built DLL folder
+- MSYS2 UCRT runtime folder
+- `/usr/local` runtime folder (for micro XRCE dependencies)
+
+```powershell
+$env:Path = "D:\windows_dll\build-ucrt64;C:\msys64\ucrt64\bin;C:\msys64\usr\local\bin;" + $env:Path
+```
+
+3) Compile the C# example:
+
+```powershell
+dotnet build -c Release
+```
+
+4) Run the C# example:
+
+```powershell
+dotnet run -- 192.168.60.80 22018 /xrce/kuka_joint_states_json 0
+```
+
+Optional arguments:
+
+- `agent_ip` (default `192.168.60.80`)
+- `agent_port` (default `22018`)
+- `topic_name` (default `/xrce/kuka_joint_states_json`)
+- `domain_id` (default `0`)
+
+### End-to-end test steps (Linux + Windows)
+
+1) Linux: start XRCE Agent
+
+```bash
+/usr/local/bin/MicroXRCEAgent udp4 -p 22018
+```
+
+2) Linux: start bridge
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /home/rob/moveit_ws/install/setup.bash
+ros2 run joint_state_xrce_bridge joint_state_xrce_bridge --ros-args \
+  -p robot_topic_regex:=^/.+/joint_states$ \
+  -p agent_ip:=192.168.60.80 \
+  -p agent_port:=22018 \
+  -p xrce_topic:=/xrce/kuka_joint_states_json
+```
+
+3) Windows: run the C# example (steps above)
+
+4) Linux (optional): publish test JointState
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /home/rob/moveit_ws/install/setup.bash
+ros2 topic pub -r 2 /kuka_1/joint_states sensor_msgs/msg/JointState "{name: ['joint_1','joint_2'], position: [1.1,2.2], velocity: [0.0,0.0], effort: [0.0,0.0]}"
+```
+
+Expected output includes lines like:
+
+```text
+RX: {"robot_name":"kuka_1","source_topic":"/kuka_1/joint_states",...}
+```
+
+If no RX output appears:
+
+- confirm `MicroXRCEAgent` and bridge are both running on Linux
+- confirm Windows `PATH` includes `D:\windows_dll\build-ucrt64`, `C:\msys64\ucrt64\bin`, and `C:\msys64\usr\local\bin`
+- verify topic name is `/xrce/kuka_joint_states_json`
+
 ## Agent Command
 
 On Linux side, run Agent:
